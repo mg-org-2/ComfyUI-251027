@@ -185,4 +185,45 @@ __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
 # Define web directory for JavaScript files
 WEB_DIRECTORY = "./web"
 
+# Register API endpoint for widget data
+def setup_api_routes():
+    """Setup API routes for widget communication"""
+    try:
+        import json
+        from server import PromptServer
+        from aiohttp import web
+
+        @PromptServer.instance.routes.get("/api/tts-audio-suite/available-characters")
+        async def get_available_characters_endpoint(request):
+            """API endpoint to get available TTS character voices including aliases"""
+            try:
+                from utils.voice.discovery import get_available_characters, voice_discovery
+                characters = list(get_available_characters())
+                # Also get character aliases
+                aliases = list(voice_discovery._character_aliases.keys()) if hasattr(voice_discovery, '_character_aliases') else []
+                # Combine and deduplicate
+                all_chars = sorted(set(characters + aliases))
+                return web.json_response({"characters": all_chars})
+            except Exception as e:
+                print(f"⚠️ Error retrieving available characters: {e}")
+                return web.json_response({"characters": [], "error": str(e)})
+
+        @PromptServer.instance.routes.get("/api/tts-audio-suite/available-languages")
+        async def get_available_languages_endpoint(request):
+            """API endpoint to get available language codes from the canonical language mapper"""
+            try:
+                from utils.models.language_mapper import LANGUAGE_ALIASES
+                # Get all unique canonical language codes (the values in LANGUAGE_ALIASES)
+                languages = sorted(set(LANGUAGE_ALIASES.values()))
+                return web.json_response({"languages": languages})
+            except Exception as e:
+                print(f"⚠️ Error retrieving available languages: {e}")
+                # Fallback list
+                return web.json_response({"languages": ["en", "de", "fr", "ja", "es", "it", "pt", "th", "no"], "error": str(e)})
+    except Exception as e:
+        print(f"⚠️ Could not setup API routes: {e}")
+
+# Setup API routes when extension loads
+setup_api_routes()
+
 # nodes.py already handles all the startup output and status reporting
